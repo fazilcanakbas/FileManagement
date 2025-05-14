@@ -97,11 +97,7 @@ builder.Services.AddAutoMapper(typeof(MappingProfile));
 
 var app = builder.Build();
 
-<<<<<<< HEAD
-=======
 
-
->>>>>>> f9754c3285c70acc415d849ae93e69ef0cba8fe5
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

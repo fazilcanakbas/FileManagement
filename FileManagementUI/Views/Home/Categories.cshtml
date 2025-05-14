@@ -1,0 +1,319 @@
+﻿@{
+    ViewData["Title"] = "Categories";
+}
+
+<div class="row">
+    <div class="col-md-8" id="divList">
+        <div class="card">
+            <div class="card-header">
+                <h3>File Categories</h3>
+            </div>
+            <div class="card-body">
+                <table class="table" id="tbCategoryList">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>File Count</th>
+                            <th>Created Date</th>
+                            <th>Last Modified</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="card-footer"></div>
+        </div>
+    </div>
+    <div class="col-md-4" id="divAddUpdate">
+        <div class="card">
+            <div class="card-header"><h4>Add/Update Category</h4></div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label>Category Name</label>
+                    <input type="hidden" class="form-control" id="txtId" />
+                    <input type="text" class="form-control" id="txtName" />
+                </div>
+                <div class="mb-3">
+                    <input type="checkbox" class="form-check-inline" id="cbIsActive" />
+                    <label>Active</label>
+                </div>
+                <div class="mb-3">
+                    <button class="btn btn-primary btn-circle" title="Save" id="btnSave"><i class="fa fa-save"></i></button>
+                    <button class="btn btn-secondary btn-circle" title="Cancel" id="btnCancel"><i class="fa fa-arrow-left"></i></button>
+                    <button class="btn btn-warning btn-circle" title="Edit" id="btnEdit"><i class="fa fa-edit"></i></button>
+                    <button class="btn btn-danger btn-circle" title="Delete" id="btnDelete"><i class="fa fa-trash"></i></button>
+                    <div class="alert mt-3" id="divResult"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function(){
+            var apiBaseUrl = "@ViewBag.ApiBaseURL";
+            var token = localStorage.getItem("token");
+            var userId = localStorage.getItem("userId");
+
+            // Check if user is logged in
+            if(token == "" || token == null){
+                location.href = "/Login";
+                return false;
+            }
+
+            GetCategoryList();
+            $("#btnCancel").hide();
+            $("#btnEdit").hide();
+            $("#btnDelete").hide();
+
+            function GetCategoryList(){
+                $.ajax({
+                    url: apiBaseUrl + "/api/Categories",
+                    type: "GET",
+                    headers: {
+                        "Authorization": "Bearer " + token
+                    },
+                    success: function (d) {
+                        CategoryToTable(d)
+                    },
+                    error: function (d) {
+                        $("#divResult")
+                            .fadeIn()
+                            .removeClass()
+                            .addClass("alert alert-danger mt-3")
+                            .html("Error loading categories")
+                            .fadeOut(3000);
+                    }
+                });
+            }
+
+            function CategoryToTable(data){
+                $("#tbCategoryList tbody").empty();
+                var row = "";
+                $.each(data, function(i, item){
+                    var bg = item.isActive == true ? 'bg-success' : 'bg-danger';
+                    var status = item.isActive == true ? 'Active' : 'Inactive';
+                    row += "<tr>";
+                    row += "<td>" + item.name + "</td>";
+                    row += "<td>" + item.fileCount + "</td>";
+                    row += "<td>" + FormatDate(item.created) + "</td>";
+                    row += "<td>" + FormatDate(item.updated) + "</td>";
+                    row += "<td><span class='text-white badge " + bg + "'>" + status + "</span></td>";
+                    row += '<td><a class="btn btn-primary btn-circle" href="/Files/' + item.id + '"><i class="fa fa-list"></i></a><button class="btn btn-warning btn-circle btnEdit" data-id="' + item.id + '"><i class="fa fa-edit"></i></button></td>';
+                    row += "</tr>";
+                });
+                $("#tbCategoryList tbody").append(row);
+            }
+
+            // Format date for display
+            function FormatDate(dateString) {
+                if (!dateString) return "";
+                var date = new Date(dateString);
+                return date.toLocaleString();
+            }
+
+            // Add new category
+            $("#btnSave").click(function(){
+                if($("#txtName").val() == "" || $("#txtName").val() == null){
+                    $("#divResult")
+                        .fadeIn()
+                        .removeClass()
+                        .addClass("alert alert-danger mt-3")
+                        .html("Please enter category name!")
+                        .fadeOut(3000);
+                    return false;
+                }
+
+                var name = $("#txtName").val();
+                var isActive = $("#cbIsActive").is(":checked");
+                var category = new Object();
+                category.name = name;
+                category.isActive = isActive;
+
+                $.ajax({
+                    url: apiBaseUrl + "/api/Categories",
+                    type: "POST",
+                    headers: {
+                        "Authorization": "Bearer " + token
+                    },
+                    data: JSON.stringify(category),
+                    contentType: "application/json",
+                    success: function (d) {
+                        if (d.success){
+                            $("#divResult")
+                                .fadeIn()
+                                .removeClass()
+                                .addClass("alert alert-success mt-3")
+                                .html("Category added successfully!")
+                                .fadeOut(3000);
+                            GetCategoryList();
+                            $("#txtName").val("");
+                            $("#cbIsActive").prop("checked", false);
+                        } else {
+                            $("#divResult")
+                                .fadeIn()
+                                .removeClass()
+                                .addClass("alert alert-danger mt-3")
+                                .html(d.message)
+                                .fadeOut(3000);
+                        }
+                    },
+                    error: function (d) {
+                        $("#divResult")
+                            .fadeIn()
+                            .removeClass()
+                            .addClass("alert alert-danger mt-3")
+                            .html("Error adding category")
+                            .fadeOut(3000);
+                    }
+                });
+            });
+
+            // Edit category button click
+            $(document).on("click", ".btnEdit", function(){
+                var id = $(this).attr("data-id");
+
+                $.ajax({
+                    url: apiBaseUrl + "/api/Categories/" + id,
+                    type: "GET",
+                    headers: {
+                        "Authorization": "Bearer " + token
+                    },
+                    contentType: "application/json",
+                    success: function (d) {
+                        $("#btnSave").hide();
+                        $("#btnCancel").show();
+                        $("#btnEdit").show();
+                        $("#btnDelete").show();
+                        $("#txtId").val(id);
+                        $("#txtName").val(d.name);
+                        $("#cbIsActive").prop("checked", d.isActive);
+                    },
+                    error: function (d) {
+                        $("#divResult")
+                            .fadeIn()
+                            .removeClass()
+                            .addClass("alert alert-danger mt-3")
+                            .html("Error fetching category")
+                            .fadeOut(3000);
+                    }
+                });
+            });
+
+            // Cancel edit mode
+            $("#btnCancel").click(function(){
+                $("#btnCancel").hide();
+                $("#btnEdit").hide();
+                $("#btnDelete").hide();
+                $("#btnSave").show();
+                $("#txtName").val("");
+                $("#txtId").val("");
+                $("#cbIsActive").prop("checked", false);
+            });
+
+            // Update category
+            $("#btnEdit").click(function(){
+                if($("#txtName").val() == "" || $("#txtName").val() == null){
+                    $("#divResult")
+                        .fadeIn()
+                        .removeClass()
+                        .addClass("alert alert-danger mt-3")
+                        .html("Please enter category name!")
+                        .fadeOut(3000);
+                    return false;
+                }
+
+                var id = $("#txtId").val();
+                var name = $("#txtName").val();
+                var isActive = $("#cbIsActive").is(":checked");
+                var category = new Object();
+                category.id = id;
+                category.name = name;
+                category.isActive = isActive;
+
+                $.ajax({
+                    url: apiBaseUrl + "/api/Categories/" + id,
+                    type: "PUT",
+                    headers: {
+                        "Authorization": "Bearer " + token
+                    },
+                    data: JSON.stringify(category),
+                    contentType: "application/json",
+                    success: function (d) {
+                        if (d.success){
+                            $("#divResult")
+                                .fadeIn()
+                                .removeClass()
+                                .addClass("alert alert-success mt-3")
+                                .html("Category updated successfully!")
+                                .fadeOut(3000);
+                            GetCategoryList();
+                            $("#btnCancel").click();
+                        } else {
+                            $("#divResult")
+                                .fadeIn()
+                                .removeClass()
+                                .addClass("alert alert-danger mt-3")
+                                .html(d.message)
+                                .fadeOut(3000);
+                        }
+                    },
+                    error: function (d) {
+                        $("#divResult")
+                            .fadeIn()
+                            .removeClass()
+                            .addClass("alert alert-danger mt-3")
+                            .html("Error updating category")
+                            .fadeOut(3000);
+                    }
+                });
+            });
+
+            // Delete category
+            $("#btnDelete").click(function(){
+                var id = $("#txtId").val();
+
+                if (confirm("Are you sure you want to delete this category?")) {
+                    $.ajax({
+                        url: apiBaseUrl + "/api/Categories/" + id,
+                        type: "DELETE",
+                        headers: {
+                            "Authorization": "Bearer " + token
+                        },
+                        contentType: "application/json",
+                        success: function (d) {
+                            if (d.success){
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-success mt-3")
+                                    .html("Category deleted successfully!")
+                                    .fadeOut(3000);
+                                GetCategoryList();
+                                $("#btnCancel").click();
+                            } else {
+                                $("#divResult")
+                                    .fadeIn()
+                                    .removeClass()
+                                    .addClass("alert alert-danger mt-3")
+                                    .html(d.message)
+                                    .fadeOut(3000);
+                            }
+                        },
+                        error: function (d) {
+                            $("#divResult")
+                                .fadeIn()
+                                .removeClass()
+                                .addClass("alert alert-danger mt-3")
+                                .html("Error deleting category")
+                                .fadeOut(3000);
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+}
